@@ -130,14 +130,14 @@ static void create_pointer_chase(size_t *array, size_t count) {
 }
 
 /* Detect cache sizes via pointer-chase */
-void probe_cache_sizes(size_t *l1_size, size_t *l2_size) {
+void probe_cache_sizes(size_t *l1_size, size_t *l2_size, size_t *l3_size) {
     const int ITERATIONS = 5;
 
     size_t sizes[] = {
         4*1024, 8*1024, 16*1024, 32*1024, 48*1024, 64*1024, 96*1024, 128*1024,
         192*1024, 256*1024, 384*1024, 512*1024, 768*1024, 1024*1024, 1536*1024,
         2*1024*1024, 3*1024*1024, 4*1024*1024, 6*1024*1024, 8*1024*1024,
-        12*1024*1024, 16*1024*1024
+        12*1024*1024, 16*1024*1024, 24*1024*1024, 32*1024*1024
     };
     int num_sizes = sizeof(sizes) / sizeof(sizes[0]);
     double times[32];
@@ -184,13 +184,16 @@ void probe_cache_sizes(size_t *l1_size, size_t *l2_size) {
 
     *l1_size = 0;
     *l2_size = 0;
+    *l3_size = 0;
 
     for (int s = 1; s < num_sizes; s++) {
         double ratio = times[s] / times[s-1];
         if (*l1_size == 0 && sizes[s-1] <= 192*1024 && ratio > 1.3) {
             *l1_size = sizes[s-1];
-        } else if (*l2_size == 0 && sizes[s-1] > 192*1024 && ratio > 1.3) {
+        } else if (*l2_size == 0 && sizes[s-1] > 192*1024 && sizes[s-1] <= 16*1024*1024 && ratio > 1.3) {
             *l2_size = sizes[s-1];
+        } else if (*l3_size == 0 && sizes[s-1] > 4*1024*1024 && ratio > 1.5) {
+            *l3_size = sizes[s-1];
         }
     }
 }
@@ -259,8 +262,8 @@ int probe_associativity(void) {
 int main(void) {
     int line_size = probe_cache_line_size();
 
-    size_t l1_size, l2_size;
-    probe_cache_sizes(&l1_size, &l2_size);
+    size_t l1_size, l2_size, l3_size;
+    probe_cache_sizes(&l1_size, &l2_size, &l3_size);
 
     int associativity = probe_associativity();
 
@@ -271,6 +274,9 @@ int main(void) {
             printf("L2 Cache:        %zu MB\n", l2_size / (1024*1024));
         else
             printf("L2 Cache:        %zu KB\n", l2_size / 1024);
+    }
+    if (l3_size > 0) {
+        printf("L3 Cache:        %zu MB\n", l3_size / (1024*1024));
     }
     printf("L1 Associativity: %d-way\n", associativity);
 
